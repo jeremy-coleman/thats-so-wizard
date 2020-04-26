@@ -8,22 +8,20 @@ const createAliasConfig = dir => ({
 var config = {
   presets: [
     ["@babel/preset-typescript", { isTsx: true, allowNamespaces: true , allowDeclareFields: true}],
-    ["babel-preset-preact"]
-
-    // ["@babel/preset-react", { 
-    //   //runtime: "automatic",
-    //   useBuiltIns: true,
-    //   //useSpread: true
-    // }]
-
+    ["@babel/preset-react", { 
+      //runtime: "automatic",
+      useBuiltIns: true,
+      //useSpread: true
+    }],
+    //["@babel/preset-env", {targets: {node: "current"}}]
   ],
-
   plugins: [
     ["babel-plugin-typescript-iife-enum"],
     ["@babel/plugin-proposal-decorators", { legacy: true }],
     ["@babel/plugin-proposal-class-properties", { loose: true }],
     ["@babel/plugin-proposal-nullish-coalescing-operator"],
     ["@babel/plugin-proposal-optional-chaining"],
+    //["@babel/plugin-transform-modules-commonjs", { noInterop: true, strict: true /**lazy: true*/ }],
     ["babel-plugin-transform-react-pug"],
     ["babel-plugin-polished"],
     ["babel-plugin-macros"],
@@ -35,7 +33,7 @@ var config = {
         extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"],
         //alias: createAliasConfig("src")
       }
-    ]
+    ],
   ],
   comments: false
 };

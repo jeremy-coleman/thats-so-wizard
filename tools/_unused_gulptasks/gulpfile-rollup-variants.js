@@ -165,6 +165,8 @@ gulp.task("rollit", function () {
 });
 
 
+var ROLLUP_CACHE = {}
+
 gulp.task("rollit:cjs", function () {
   return (
     gulp.src(["./src/**/*{.js,.jsx,.ts,.tsx}"])
@@ -172,6 +174,8 @@ gulp.task("rollit:cjs", function () {
       .pipe(babel())
       .pipe(
         rollup({
+          //cache: ROLLUP_CACHE,
+          separateCaches: ROLLUP_CACHE,
           input: "src/app/main.js",
           output: {
             format: "cjs"
@@ -199,11 +203,13 @@ gulp.task("rollit:cjs", function () {
           },
         })
       )
+      .on('bundle', function(bundle, name) {
+        ROLLUP_CACHE[name] = bundle;
+      })
       .pipe(rename("main.js"))
-      .pipe(gulp.dest("build/app"))
+      .pipe(gulp.dest("build"))
   );
 });
-
 
 gulp.task("rollit:minify", function () {
   return (

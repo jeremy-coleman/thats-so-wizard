@@ -2,6 +2,8 @@ import { h, render, Component } from 'preact'
 import { createStore, Provider, connect } from 'unistore/full/preact'
 import {MobxApp} from './mobx-app'
 
+import {BlueBorderEmotion, BlueBorderStyled} from '@demo/components'
+
 //import './style.less'
 
 interface State {
@@ -53,7 +55,8 @@ class App extends Component<Props, any> {
         <section>
           <MobxApp/>
         </section>
-        
+        <BlueBorderStyled>styled components</BlueBorderStyled>
+        <BlueBorderEmotion>emotion</BlueBorderEmotion>
       </div>
     )
   }
