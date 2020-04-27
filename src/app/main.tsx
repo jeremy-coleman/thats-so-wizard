@@ -64,12 +64,23 @@ class App extends Component<Props, any> {
   }
 }
 
-render((
-  <Provider store={store}>
-    <App />
-  </Provider>
-), document.getElementById('content'))
+const mountApp = ({selector}) => {
+  render((
+    <Provider store={store}>
+      <App />
+    </Provider>
+  ), document.querySelector(selector))
+}
 
+mountApp({selector: "#content"})
+
+export {mountApp}
+
+// render((
+//   <Provider store={store}>
+//     <App />
+//   </Provider>
+// ), document.getElementById('content'))
 //document.body also works fine
 
 

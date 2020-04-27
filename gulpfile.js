@@ -306,7 +306,7 @@ gulp.task("roll:mjs", function () {
           inlineDynamicImports: true,
           plugins: [
             //terser makes closure work, idk why , dont care either, it works
-            terser(),
+            //terser(),
             closure()
           ]
         })
@@ -315,7 +315,6 @@ gulp.task("roll:mjs", function () {
       .pipe(gulp.dest("build/app"))
   );
 });
-
 
 const serve = () => {
   const { polka, sirv } = require("./tools/devserver");
@@ -370,7 +369,7 @@ const runTinyify = () => {
       dedupe: true
   })
   .transform(sucrasify, {global: true})
-  .plugin(discify, {outdir: "build/public/disc_tinyify"})
+  .plugin(discify, {outdir: "build/public/disc"})
   .plugin(tinyify)
   .transform([
     envify({
@@ -392,11 +391,10 @@ const runTinyify = () => {
   ])
   .bundle()
   .on("error", console.error)
+  .on("syntax", console.log)
   .pipe(fs.createWriteStream("build/public/main.js"))
   .on("close", () => logFileSize("build/public/main.js"))
-  
-  b.on("error", console.log);
-  b.on("syntax", console.log);
+
 }
 
 
