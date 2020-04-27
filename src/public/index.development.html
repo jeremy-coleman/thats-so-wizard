@@ -89,6 +89,11 @@
   <body>
     <div id="content"></div>
     <script src="/main.js"></script>
+    <script>
+      if(module && module['hot']){
+        module['hot'].accept()
+      }
+    </script>
   </body>
 
 </html>

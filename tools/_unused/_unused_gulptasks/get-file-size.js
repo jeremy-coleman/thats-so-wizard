@@ -1,4 +1,5 @@
 var fs= require('fs')
+
 function getFileSize(filePath) {
     var size = fs.statSync(filePath).size;
     var i = Math.floor(Math.log(size) / Math.log(1024));

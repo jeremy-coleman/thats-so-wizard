@@ -1,8 +1,9 @@
 import { h, render, Component } from 'preact'
 import { createStore, Provider, connect } from 'unistore/full/preact'
 import {MobxApp} from './mobx-app'
+import {BlueBorderEmotion, BlueBorderStyled , PugComponent} from '@demo/components'
 
-import {BlueBorderEmotion, BlueBorderStyled} from '@demo/components'
+window["h"] = h
 
 //import './style.less'
 
@@ -57,6 +58,7 @@ class App extends Component<Props, any> {
         </section>
         <BlueBorderStyled>styled components</BlueBorderStyled>
         <BlueBorderEmotion>emotion</BlueBorderEmotion>
+        <PugComponent>pug</PugComponent>
       </div>
     )
   }
@@ -70,6 +72,9 @@ render((
 
 //document.body also works fine
 
-if(module && module['hot']){
-  module['hot'].accept()
+
+if (process.env.NODE_ENV === 'development') {
+  if(module && module['hot']){
+      module['hot'].accept()
+  }
 }

@@ -17,6 +17,7 @@ var discify = require("discify")
 var tinyify = require('tinyify')
 
 var babel = require("gulp-babel");
+var clip = require('gulp-clip-empty-files')
 var gulp_typescript = require("gulp-typescript");
 var livereload = require("gulp-livereload");
 var concat = require("gulp-concat");
@@ -26,6 +27,11 @@ var rename = require('gulp-rename')
 var rollup = require("./tools/gulptasks/gulp-rollup");
 var closure = require('@ampproject/rollup-plugin-closure-compiler')
 const {terser} = require('rollup-plugin-terser')
+var rollupStream = require('@rollup/stream');
+var commonjs = require("@rollup/plugin-commonjs")
+var buffer = require('vinyl-buffer');
+var source = require('vinyl-source-stream');
+var nodeResolve = require("@rollup/plugin-node-resolve")
 
 
 var typescript = gulp_typescript.createProject("tsconfig.json", {
@@ -42,12 +48,29 @@ var typescript = gulp_typescript.createProject("tsconfig.json", {
   skipLibCheck: true
 });
 
+
+var typescript_inlineHelpers = gulp_typescript.createProject("tsconfig.json", {
+  module: "esnext",
+  target: "esnext",
+  importHelpers: false,
+  removeComments: true,
+  allowJs: true,
+  jsx: "react",
+  jsxFactory: "h",
+  experimentalDecorators: true,
+  noResolve: true,
+  isolatedModules: true,
+  skipLibCheck: true
+});
+
+const createAliasConfig = dir => ({
+  "@demo": `./${dir}/@demo`
+});
+
 /** @type import("@babel/core").TransformOptions */
 var BABEL_CONFIG = {
   plugins: [
     ["babel-plugin-transform-react-pug"],
-    ["@babel/plugin-transform-react-jsx", {pragma: "h"}],
-    [require.resolve("./tools/babel-plugins/require-preact.js")],
     ["babel-plugin-polished"],
     ["babel-plugin-macros"],
     ["babel-plugin-add-import-extension"],
@@ -64,7 +87,7 @@ var BABEL_CONFIG = {
 };
 
 /** @type import("@babel/core").TransformOptions */
-var BABEL_CONFIG_RESOLVE_BARE = {
+var BABEL_CONFIG_ES_BUNDLE = {
   plugins: [
     ["babel-plugin-transform-react-pug"],
     ["babel-plugin-polished"],
@@ -94,11 +117,11 @@ var BABEL_CONFIG_RESOLVE_BARE = {
 
 gulp.task("clean", () => del(["dist"]));
 
-gulp.task("babel:expand-bare-import-paths", () => {
+gulp.task("babel1", () => {
   return gulp
     .src(["src/**/*.{tsx,ts,jsx,js}", "!src/**/*.{spec,test}.*"])
     .pipe(typescript())
-    .pipe(babel(BABEL_CONFIG_RESOLVE_BARE))
+    .pipe(babel(BABEL_CONFIG_ES_BUNDLE))
     .pipe(gulp.dest("build"));
 });
 
@@ -111,7 +134,7 @@ gulp.task("babel", () => {
     .pipe(gulp.dest("build"));
 });
 
-gulp.task("html:development", () => {
+gulp.task("html", () => {
     return gulp
       .src(["src/public/index.development.html"])
       .pipe(rename("index.html"))
@@ -181,6 +204,46 @@ async function bundle() {
     .pipe(fs.createWriteStream("build/public/main.js"));
 }
 
+gulp.task("rollit", function () {
+  return (
+    gulp.src(["./src/**/*{.js,.jsx,.ts,.tsx}"])
+      .pipe(typescript())
+      .pipe(babel(BABEL_CONFIG))
+      .pipe(
+        rollup({
+          input: "src/app/main.js",
+          output: {
+            format: "esm"
+          },
+          //external: Object.keys(require("./package.json").dependencies),
+          treeshake: {
+            moduleSideEffects: false
+          },
+          inlineDynamicImports: true,
+          plugins: [
+            commonjs(),
+            nodeResolve(),
+            terser(),
+            closure()
+          ],
+          onwarn: function(message) {
+            if (/external dependency/.test(message)) {
+              return
+            }
+            if (message.code === 'CIRCULAR_DEPENDENCY') {
+              return
+            }
+            if (message.code === 'INPUT_HOOK_IN_OUTPUT_PLUGIN') {
+              return
+            }
+            else console.error(message)
+          },
+        })
+      )
+      .pipe(gulp.dest("build"))
+  );
+});
+
 
 gulp.task("roll:app", function () {
   return (
@@ -237,7 +300,10 @@ gulp.task("roll:cjs", function () {
             moduleSideEffects: false
           },
           inlineDynamicImports: true,
-          plugins: [],
+          plugins: [
+            //terser(),
+            //closure()
+          ],
           onwarn: function(message) {
             if (/external dependency/.test(message)) {
               return
@@ -258,7 +324,7 @@ gulp.task("roll:cjs", function () {
 });
 
 
-gulp.task("roll:minify", function () {
+gulp.task("roll:pre-tinyify", function () {
   return (
     gulp.src(["./src/**/*{.js,.jsx,.ts,.tsx}"])
       .pipe(typescript())
@@ -267,7 +333,7 @@ gulp.task("roll:minify", function () {
         rollup({
           input: "src/app/main.js",
           output: {
-            format: "esm",
+            format: "cjs",
             dir: "build"
           },
           external: Object.keys(require("./package.json").dependencies),
@@ -276,7 +342,6 @@ gulp.task("roll:minify", function () {
           },
           inlineDynamicImports: true,
           plugins: [
-            //terser makes closure work, idk why , dont care either, it works
             terser(),
             closure()
           ]
@@ -287,35 +352,38 @@ gulp.task("roll:minify", function () {
   );
 });
 
-gulp.task("roll:mjs", function () {
+
+
+gulp.task("roll:esbundle", function () {
   return (
-    gulp.src(["./build/public/main.js"])
-      //.pipe(typescript())
-      //.pipe(babel(BABEL_CONFIG))
+    gulp.src(["./src/**/*{.js,.jsx,.ts,.tsx}"])
+      .pipe(typescript())
+      .pipe(babel(Object.assign({}, BABEL_CONFIG, 
+
+      )))
       .pipe(
         rollup({
-          input: "build/public/main.js",
+          input: "src/app/main.js",
           output: {
-            format: "esm",
-            dir: "build"
+            format: "esm"
           },
-          external: Object.keys(require("./package.json").dependencies),
+          //external: Object.keys(require("./package.json").dependencies),
           treeshake: {
             moduleSideEffects: false
           },
           inlineDynamicImports: true,
           plugins: [
-            //terser makes closure work, idk why , dont care either, it works
+            commonjs(),
+            nodeResolve(),
             terser(),
             closure()
           ]
         })
       )
-      .pipe(rename("main.mjs"))
-      .pipe(gulp.dest("build/app"))
+      .pipe(rename("main.js"))
+      .pipe(gulp.dest("build/public"))
   );
 });
-
 
 const serve = () => {
   const { polka, sirv } = require("./tools/devserver");
@@ -347,6 +415,22 @@ const serve = () => {
 };
 
 
+gulp.task("watch", async () => {
+  livereload.listen();
+  gulp.watch("src/**/*.{css,less}", gulp.series("styles"));
+  gulp.watch("src/**/*.html", gulp.series("html"));
+  gulp.watch("src/**/*.{ts,tsx,js,jsx}", gulp.series("roll:app"));
+});
+
+gulp.task(
+  "start",
+  gulp.series(
+    "clean",
+    gulp.parallel("roll:app", "styles", "html"),
+    gulp.parallel(bundle, "watch", serve)
+  )
+);
+
 
 function logFileSize(filePath) {
     var size = fs.statSync(filePath).size;
@@ -369,7 +453,6 @@ const runTinyify = () => {
       fullPaths: false,
       dedupe: true
   })
-  .transform(sucrasify, {global: true})
   .plugin(discify, {outdir: "build/public/disc_tinyify"})
   .plugin(tinyify)
   .transform([
@@ -400,32 +483,83 @@ const runTinyify = () => {
 }
 
 
-
-gulp.task("watch", async () => {
-  livereload.listen();
-  gulp.watch("src/**/*.{css,less}", gulp.series("styles"));
-  gulp.watch("src/**/*.html", gulp.series("html:development"));
-  gulp.watch("src/**/*.{ts,tsx,js,jsx}", gulp.series("roll:app"));
-});
-
-
-gulp.task(
-  "start",
+gulp.task("bundle:tinyify",
   gulp.series(
     "clean",
-    gulp.parallel("roll:app", "styles", "html:development"),
-    gulp.parallel(bundle, "watch", serve)
-  )
-);
-
-
-gulp.task("bundle",
-  gulp.series(
-    "clean",
-    gulp.parallel("roll:minify", "styles", "html:production"),
+    gulp.parallel("roll:pre-tinyify", "styles", "html:production"),
     gulp.parallel([runTinyify, serve])
   )
 );
+
+
+gulp.task("bundle:rollup",
+  gulp.series(
+    "clean",
+    gulp.parallel("roll:esbundle", "styles", "html:production"),
+    //gulp.parallel([runTinyify, serve])
+  ),
+);
+
+
+
+let ROLLUP_CACHE;
+
+gulp.task('rollup:post-run', () => {
+  return rollupStream({
+      cache: ROLLUP_CACHE,
+      input: 'build/app/main.js',
+      output: {
+          format: "esm"
+        },
+        //external: Object.keys(require("./package.json").dependencies),
+        treeshake: {
+          moduleSideEffects: false
+        },
+        inlineDynamicImports: true,
+        plugins: [
+          
+          commonjs({
+            namedExports: {
+            //'node_modules/react/index.js': Object.keys(require("react")),
+            //'node_modules/react-dom/index.js': Object.keys(require("react-dom"))
+            'node_modules/react-is/index.js': Object.keys(require("react-is")),
+          }
+          }),
+          nodeResolve()
+          //terser(),
+          //closure()
+        ],
+        onwarn: function(message) {
+          if (/external dependency/.test(message)) {
+            return
+          }
+          if (message.code === 'CIRCULAR_DEPENDENCY') {
+            return
+          }
+          if (message.code === 'INPUT_HOOK_IN_OUTPUT_PLUGIN') {
+            return
+          }
+          else console.error(message)
+        }
+    })
+    .on('bundle', (bundle) => {
+      cache = bundle;
+    })
+    .pipe(source('main.js'))
+    .pipe(buffer())
+    .pipe(gulp.dest('build/public'));
+});
+
+gulp.task('watch', (done) => {
+  gulp.watch('./src/**/*.js', gulp.series('rollup'));
+
+  // or, with Gulp v3
+  // gulp.watch('./src/**/*.js', ['rollup']);
+
+  done();
+});
+
+
 
 // .pipe(source('main.js'))
 // .pipe(buffer())
