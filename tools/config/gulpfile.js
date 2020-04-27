@@ -15,9 +15,6 @@ const aliasify = require("./tools/transforms/aliasify");
 var { sucrasify } = require("./tools/transforms/sucrasify");
 var discify = require("discify");
 var tinyify = require("tinyify");
-var split_require = require("split-require");
-var babelify = require("./tools/transforms/babelify");
-var tsify = require("./tools/transforms/tsify");
 
 var babel = require("gulp-babel");
 var gulp_typescript = require("gulp-typescript");
@@ -25,8 +22,7 @@ var livereload = require("gulp-livereload");
 var concat = require("gulp-concat");
 var less = require("gulp-less");
 var rename = require("gulp-rename");
-var postcss = require("gulp-postcss");
-var dom = require("gulp-dom");
+var postcss = require("gulp-postcss")
 
 var rollup = require("./tools/gulptasks/gulp-rollup");
 var closure = require("@ampproject/rollup-plugin-closure-compiler");
@@ -49,11 +45,9 @@ var typescript = gulp_typescript.createProject("tsconfig.json", {
 /** @type import("@babel/core").TransformOptions */
 var BABEL_CONFIG = {
   plugins: [
-    //["@babel/plugin-syntax-dynamic-import"],
     ["babel-plugin-transform-react-pug"],
     ["@babel/plugin-transform-react-jsx", { pragma: "h" }],
     [require.resolve("./tools/babel-plugins/require-preact.js")],
-    [require.resolve("./tools/babel-plugins/split-require")],
     ["babel-plugin-polished"],
     ["babel-plugin-macros"],
     ["babel-plugin-add-import-extension"],
@@ -69,7 +63,47 @@ var BABEL_CONFIG = {
   comments: false,
 };
 
+/** @type import("@babel/core").TransformOptions */
+var BABEL_CONFIG_RESOLVE_BARE = {
+  plugins: [
+    ["babel-plugin-transform-react-pug"],
+    ["babel-plugin-polished"],
+    ["babel-plugin-macros"],
+    [
+      "bare-import-rewrite",
+      {
+        modulesDir: "/node_modules",
+        rootBaseDir: "src",
+        alwaysRootImport: [],
+        ignorePrefixes: ["//"],
+        failOnUnresolved: false,
+        resolveDirectories: ["node_modules"],
+        processAtProgramExit: false,
+        preserveSymlinks: true,
+      },
+    ],
+    ["babel-plugin-add-import-extension"],
+    [
+      "babel-plugin-module-resolver",
+      {
+        root: ["src"],
+        extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"],
+        //alias: createAliasConfig("src")
+      },
+    ],
+  ],
+  comments: false,
+};
+
 gulp.task("clean", () => del(["dist"]));
+
+gulp.task("babel:expand-bare-import-paths", () => {
+  return gulp
+    .src(["src/**/*.{tsx,ts,jsx,js}", "!src/**/*.{spec,test}.*"])
+    .pipe(typescript())
+    .pipe(babel(BABEL_CONFIG_RESOLVE_BARE))
+    .pipe(gulp.dest("build"));
+});
 
 gulp.task("babel", () => {
   return gulp
@@ -77,21 +111,6 @@ gulp.task("babel", () => {
     .pipe(typescript())
     .pipe(babel(BABEL_CONFIG))
     .pipe(gulp.dest("build"));
-});
-
-const insertScript = ({ templateReadPath, templateWritePath, scriptPath }) => {
-  let t = jetpack
-    .read(templateReadPath)
-    .replace("</body>", `<script src=${scriptPath}></script></body>`);
-  jetpack.write(templateWritePath, t);
-};
-
-gulp.task("html:production", async () => {
-  insertScript({
-    templateReadPath: "src/public/index.production.html",
-    scriptPath: "./bundle.1.js",
-    templateWritePath: "build/public/index.html",
-  });
 });
 
 gulp.task("html:development", () => {
@@ -102,17 +121,12 @@ gulp.task("html:development", () => {
     .pipe(livereload());
 });
 
-// gulp.task("html:production", () => {
-//   insertScript({
-//     templatePath: "src/public/index.production.html",
-//     scriptPath: "./bundle.1.js",
-//   });
-//   return gulp
-//     .src(["src/public/index.production.html"])
-//     .pipe(rename("index.html"))
-//     .pipe(gulp.dest("build/public"));
-// });
-
+gulp.task("html:production", () => {
+  return gulp
+    .src(["src/public/index.production.html"])
+    .pipe(rename("index.html"))
+    .pipe(gulp.dest("build/public"));
+});
 
 gulp.task("styles", async () => {
   gulp
@@ -136,9 +150,8 @@ const b = watchify(
     //dedupe: true
   })
 );
-b.plugin(split_require, { out: "build/public" });
 b.plugin(discify, { outdir: "build/public/disc" });
-//b.plugin(hmr);
+b.plugin(hmr);
 b.transform(sucrasify);
 b.transform([
   envify({
@@ -149,7 +162,10 @@ b.transform([
 b.transform([
   aliasify.configure({
     aliases: {
-      "react": "preact/compat",
+      //"react": "react/cjs/react.production.min.js",
+      //"react-dom": "react-dom/cjs/react-dom.production.min.js"
+      //"react-dom": "react-dom/cjs/react-dom.profiling.min.js",
+      react: "preact/compat",
       "react-dom": "preact/compat",
     },
     appliesTo: { includeExtensions: [".js", ".jsx", ".tsx", ".ts"] },
@@ -167,55 +183,9 @@ async function bundle() {
     .pipe(fs.createWriteStream("build/public/main.js"));
 }
 
-gulp.task("browserify", async () => {
-  const b = browserify({
-    entries: ["build/app/main.js"],
-    extensions: [".ts", ".tsx", ".js", ".jsx"],
-    cache: {},
-    packageCache: {},
-    debug: false,
-    sourceMaps: false,
-    fullPaths: true,
-    //dedupe: true
-  });
-  b.plugin(split_require, { out: "build/public" });
-  b.plugin(discify, { outdir: "build/public/disc" });
-  //b.plugin(hmr);
-
-  b.transform(sucrasify);
-  b.transform([
-    envify({
-      NODE_ENV: "development",
-    }),
-    { global: true },
-  ]);
-  b.transform([
-    aliasify.configure({
-      aliases: {
-        "react": "preact/compat",
-        "react-dom": "preact/compat",
-      },
-      appliesTo: { includeExtensions: [".js", ".jsx", ".tsx", ".ts"] },
-    }),
-    { global: true },
-  ]);
-
-  b.on("error", console.log);
-  b.on("syntax", console.log);
-  b.on("update", bundle);
-
-  async function bundle() {
-    b.bundle()
-      .on("error", console.error)
-      .pipe(fs.createWriteStream("build/public/main.js"));
-  }
-
-  bundle();
-});
-
-gulp.task("rollit", function () {
+gulp.task("roll:app", function () {
   return gulp
-    .src(["src/**/*.{tsx,ts,jsx,js}", "!src/**/*.{spec,test}.*"])
+    .src(["./src/**/*{.js,.jsx,.ts,.tsx}"])
     .pipe(typescript())
     .pipe(babel(BABEL_CONFIG))
     .pipe(
@@ -230,9 +200,8 @@ gulp.task("rollit", function () {
         },
         inlineDynamicImports: true,
         plugins: [
-          //terser makes closure work, idk why , dont care either, it works
           //terser(),
-          //closure(),
+          //closure()
         ],
         onwarn: function (message) {
           if (/external dependency/.test(message)) {
@@ -247,8 +216,82 @@ gulp.task("rollit", function () {
         },
       })
     )
-    .pipe(rename("main.mjs"))
-    .pipe(gulp.dest("build/app"));
+    .pipe(gulp.dest("build"));
+});
+
+gulp.task("roll:cjs", function () {
+  return gulp
+    .src(["./src/**/*{.js,.jsx,.ts,.tsx}"])
+    .pipe(typescript())
+    .pipe(babel(BABEL_CONFIG))
+    .pipe(
+      rollup({
+        input: "src/app/main.js",
+        output: {
+          format: "cjs",
+        },
+        external: Object.keys(require("./package.json").dependencies),
+        treeshake: {
+          moduleSideEffects: false,
+        },
+        inlineDynamicImports: true,
+        plugins: [],
+        onwarn: function (message) {
+          if (/external dependency/.test(message)) {
+            return;
+          }
+          if (message.code === "CIRCULAR_DEPENDENCY") {
+            return;
+          }
+          if (message.code === "INPUT_HOOK_IN_OUTPUT_PLUGIN") {
+            return;
+          } else console.error(message);
+        },
+      })
+    )
+    .pipe(rename("main.js"))
+    .pipe(gulp.dest("build"));
+});
+
+gulp.task("roll:mjs", function () {
+  return (
+    gulp
+      .src(["./build/public/main.js"])
+      //.pipe(typescript())
+      //.pipe(babel(BABEL_CONFIG))
+      .pipe(
+        rollup({
+          input: "build/public/main.js",
+          output: {
+            format: "esm",
+            dir: "build",
+          },
+          external: Object.keys(require("./package.json").dependencies),
+          treeshake: {
+            moduleSideEffects: false,
+          },
+          inlineDynamicImports: true,
+          plugins: [
+            //terser makes closure work, idk why , dont care either, it works
+            //terser(),
+            closure(),
+          ],
+          onwarn: function (message) {
+            if (/external dependency/.test(message)) {
+              return;
+            }
+            if (message.code === "CIRCULAR_DEPENDENCY") {
+              return;
+            }
+            if (message.code === "INPUT_HOOK_IN_OUTPUT_PLUGIN") {
+              return;
+            } else console.error(message);
+          },
+        })
+      )
+      .pipe(rename("main.mjs"))
+      .pipe(gulp.dest("build/app"))
+  );
 });
 
 const serve = () => {
@@ -294,42 +337,43 @@ function logFileSize(filePath) {
 }
 
 const runTinyify = () => {
-  Promise.resolve(
-    browserify({
-      entries: ["build/app/main.js"],
-      extensions: [".ts", ".tsx", ".js", ".jsx"],
-      cache: {},
-      packageCache: {},
-      debug: false,
-      sourceMaps: false,
-      fullPaths: false,
-      dedupe: true,
-    })
-      .transform(sucrasify, { global: true })
-      .plugin(discify, { outdir: "build/public/disc" })
-      .plugin(tinyify)
-      .transform([
-        envify({
-          NODE_ENV: "production",
-        }),
-        { global: true },
-      ])
-      .transform([
-        aliasify.configure({
-          aliases: {
-            "react": "preact/compat",
-            "react-dom": "preact/compat",
-          },
-          appliesTo: { includeExtensions: [".js", ".jsx", ".tsx", ".ts"] },
-        }),
-        { global: true },
-      ])
-      .bundle()
-      .on("error", console.error)
-      .on("syntax", console.log)
-      .pipe(fs.createWriteStream("build/public/main.js"))
-      .on("close", () => logFileSize("build/public/main.js"))
-  ).catch((e) => console.log(e));
+  const b = browserify({
+    entries: ["build/app/main.js"],
+    extensions: [".ts", ".tsx", ".js", ".jsx"],
+    cache: {},
+    packageCache: {},
+    debug: false,
+    sourceMaps: false,
+    fullPaths: false,
+    dedupe: true,
+  })
+    .transform(sucrasify, { global: true })
+    .plugin(discify, { outdir: "build/public/disc" })
+    .plugin(tinyify)
+    .transform([
+      envify({
+        NODE_ENV: "production",
+      }),
+      { global: true },
+    ])
+    .transform([
+      aliasify.configure({
+        aliases: {
+          //"react": "react/cjs/react.production.min.js",
+          //"react-dom": "react-dom/cjs/react-dom.production.min.js"
+          //"react-dom": "react-dom/cjs/react-dom.profiling.min.js",
+          react: "preact/compat",
+          "react-dom": "preact/compat",
+        },
+        appliesTo: { includeExtensions: [".js", ".jsx", ".tsx", ".ts"] },
+      }),
+      { global: true },
+    ])
+    .bundle()
+    .on("error", console.error)
+    .on("syntax", console.log)
+    .pipe(fs.createWriteStream("build/public/main.js"))
+    .on("close", () => logFileSize("build/public/main.js"));
 };
 
 gulp.task("watch", async () => {
@@ -352,21 +396,10 @@ gulp.task(
   "bundle",
   gulp.series(
     "clean",
-    gulp.parallel("rollit", "styles", "html:production"),
+    gulp.parallel("roll:minify", "styles", "html:production"),
     gulp.parallel([runTinyify, serve])
   )
 );
-
-gulp.task(
-  "split",
-  gulp.series(
-    "clean",
-    "babel",
-    gulp.parallel("browserify", "styles", "html:production", serve),
-    //gulp.parallel([serve])
-  )
-);
-
 
 // .pipe(source('main.js'))
 // .pipe(buffer())
@@ -403,35 +436,3 @@ gulp.task(
 
 // wtb pt 96 font
 // VIVA LA BROWSERIFY
-
-/** @type import("@babel/core").TransformOptions */
-// var BABEL_CONFIG_RESOLVE_BARE = {
-//   plugins: [
-//     ["babel-plugin-transform-react-pug"],
-//     ["babel-plugin-polished"],
-//     ["babel-plugin-macros"],
-//     [
-//       "bare-import-rewrite",
-//       {
-//         modulesDir: "/node_modules",
-//         rootBaseDir: "src",
-//         alwaysRootImport: [],
-//         ignorePrefixes: ["//"],
-//         failOnUnresolved: false,
-//         resolveDirectories: ["node_modules"],
-//         processAtProgramExit: false,
-//         preserveSymlinks: true,
-//       },
-//     ],
-//     ["babel-plugin-add-import-extension"],
-//     [
-//       "babel-plugin-module-resolver",
-//       {
-//         root: ["src"],
-//         extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"],
-//         //alias: createAliasConfig("src")
-//       },
-//     ],
-//   ],
-//   comments: false,
-// };

@@ -1,91 +1,59 @@
-import { h, render, Component } from 'preact'
-import { createStore, Provider, connect } from 'unistore/full/preact'
-import {MobxApp} from './mobx-app'
-import {BlueBorderEmotion, BlueBorderStyled , PugComponent} from '@demo/components'
+
+//require('preact/devtools')
+import { h, render } from "preact";
+import { Provider } from 'unistore/full/preact';
+import { App } from "./routes";
+import {store} from './store'
+
+
+window["h"] = h;
+
+//type P = typeof document.body.style.setProperty;
+let bodyProp = (a, b, c?) => document.body.style.setProperty(a, b, c);
+
+bodyProp("--cog-primary", "orange");
+bodyProp("--cog-secondary", "orange");
+bodyProp("--cog-bg-dark", "#424242");
+bodyProp("--cog-text-light", "white");
+bodyProp("--cog-theme-primary", "#424242");
+bodyProp("--cog-theme-secondary", "#424242");
+bodyProp("--intent-success", "green");
+bodyProp("--intent-warning", "orange");
+bodyProp("--intent-fail", "red");
+bodyProp("--intent-danger", "#a80000");
+
 
 window["h"] = h
 
-//import './style.less'
-
-interface State {
-  count: number
-}
-
-let store = createStore<State>({ count: 0 })
-
-let actions = () => ({
-  increment (state: State): State {
-    return { count: state.count + 1 }
-  },
-
-  decrement (state: State): State {
-    return { count: state.count - 1 }
-  }
-})
-
-interface Props {
-  count?: number,
-  increment?: any,
-  decrement?: any
-}
-
-@connect('count', actions)
-class UnistoreApp extends Component<Props, any> {
-  render () {
-    return (
-      <div>
-          <p>Count: {this.props.count}</p>
-          <button onClick={this.props.increment}>Increment</button>
-          <button onClick={this.props.decrement}>Decrement</button>
-      </div>
-    )
-  }
-}
 
 
-class App extends Component<Props, any> {
-  render () {
-    return (
-      <div>
-        <header>Unistore Counter</header>
-        <section>
-			<UnistoreApp/>
-        </section>
-
-        <header>Mobx Counter</header>
-        <section>
-          <MobxApp/>
-        </section>
-        <BlueBorderStyled>styled components</BlueBorderStyled>
-        <BlueBorderEmotion>emotion</BlueBorderEmotion>
-        <PugComponent>pug</PugComponent>
-      </div>
-    )
-  }
-}
 
 const mountApp = ({selector}) => {
-  render((
-    <Provider store={store}>
-      <App />
-    </Provider>
-  ), document.querySelector(selector))
-}
-
+    render((
+      <Provider store={store}>
+        <App />
+      </Provider>
+    ), document.querySelector(selector))
+  }
+  
 mountApp({selector: "#content"})
 
-export {mountApp}
-
-// render((
-//   <Provider store={store}>
-//     <App />
-//   </Provider>
-// ), document.getElementById('content'))
-//document.body also works fine
+export { mountApp };
 
 
 if (process.env.NODE_ENV === 'development') {
-  if(module && module['hot']){
-      module['hot'].accept()
-  }
+    
+    if(module && module['hot']){
+        module['hot'].accept()
+    }
 }
+
+
+// let MaterialIconLink=document.createElement("link")
+// MaterialIconLink.href="https://fonts.googleapis.com/icon?family=Material+Icons"
+// MaterialIconLink.rel="stylesheet"
+// document.head.appendChild(MaterialIconLink)
+
+// 	if ('serviceWorker' in navigator && location.protocol === 'https:') {
+// 		navigator.serviceWorker.register('/sw.js');
+// 	}

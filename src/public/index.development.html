@@ -11,6 +11,7 @@
       href="https://fonts.googleapis.com/icon?family=Material+Icons"
       rel="stylesheet"
     />
+    <link href="https://unpkg.com/browse/normalize.css@7.0.0/normalize.css" rel="stylesheet"/>
     <style>
       :root {
         --theme-darker: #004578;
@@ -81,19 +82,33 @@
 
         --intent-danger: #a80000;
       }
+
+      body,
+      #content {
+        width: 100vw;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      .middle-panel {
+        position: relative;
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: row;
+        min-height: 100%;
+        height: 100%;
+        min-width: 100%;
+        width: 100%;
+      }
+
     </style>
 
     <link rel="stylesheet" href="/styles.css" />
     <script async defer src="http://localhost:35729/livereload.js"></script>
   </head>
   <body>
-    <div id="content"></div>
+    <div id="content" class="middle-panel"></div>
     <script src="/main.js"></script>
-    <script>
-      if(module && module['hot']){
-        module['hot'].accept()
-      }
-    </script>
   </body>
 
 </html>

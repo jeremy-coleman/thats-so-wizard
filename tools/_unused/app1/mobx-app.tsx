@@ -2,7 +2,6 @@
 import { action, observable } from "mobx"
 import { observer } from "mobx-react"
 import { Component, h,  } from "preact"
-
 import {html} from 'htm/preact'
 
 //install https://github.com/mjbvz/vscode-lit-html for syntax highlighting
