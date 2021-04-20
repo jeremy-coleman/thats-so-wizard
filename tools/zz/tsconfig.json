@@ -1,0 +1,22 @@
+{
+	"compilerOptions": {
+		"baseUrl": "src",
+		"outDir": "_never",
+		"target": "esnext",
+		"lib": ["esnext", "dom"],
+		"module": "esnext",
+		"moduleResolution": "node",
+		"jsx": "preserve",
+		"experimentalDecorators": true,
+		"sourceMap": false,
+		"allowSyntheticDefaultImports": true,
+		"plugins": [
+			{
+			  "name": "ts-lit-plugin",
+			  "rules": {
+				"no-complex-attribute-binding": "off"
+			  }
+			}
+		  ]
+	}
+}

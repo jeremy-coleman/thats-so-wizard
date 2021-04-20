@@ -1,0 +1,14 @@
+legacy-peer-deps = true
+
+//package-lock = false
+//save-exact = true
+//python=C:\Windows\py.exe
+//registry=https://registry.npmjs.org/
+//progress=false
+//pnpm stuff
+//prefer-offline=true
+//always-auth=false
+//link-workspace-packages = true
+//shared-workspace-lockfile = true
+//shamefully-hoist = true
+//reporter = silent

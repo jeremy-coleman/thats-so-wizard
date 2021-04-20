@@ -1,24 +1,33 @@
+
 var gulp = require("gulp");
 var FwdRef = require("undertaker-forward-reference");
 gulp.registry(FwdRef());
 
 var path = require("path");
 var fs = require("fs");
+var jetpack = require("fs-jetpack");
 var del = require("del");
 
 var browserify = require("browserify");
 var watchify = require("watchify");
-var hmr = require("browserify-hmr");
+var envify = require("loose-envify/custom");
+//const hmr = require("./tools/devserver/hmr-plugin");
+//const hmr = require("./tools/devserver/livereactload");
+var hmr = require("browserify-hmr")
+const aliasify = require("./tools/transforms/aliasify");
 var { sucrasify } = require("./tools/transforms/sucrasify");
 var discify = require("discify");
+var tinyify = require("tinyify");
 
+var babel = require("gulp-babel");
 var gulp_typescript = require("gulp-typescript");
 var livereload = require("gulp-livereload");
 var concat = require("gulp-concat");
 var less = require("./tools/gulp-plugins/gulp-less");
 var rename = require("gulp-rename");
 
-var rollup = require("./tools/gulp-plugins/gulp-rollup");
+var rollup = require("./tools/gulptasks/gulp-rollup");
+
 
 var typescript = gulp_typescript.createProject("tsconfig.json", {
   module: "esnext",
@@ -33,7 +42,38 @@ var typescript = gulp_typescript.createProject("tsconfig.json", {
   skipLibCheck: true,
 });
 
+/** @type import("@babel/core").TransformOptions */
+var BABEL_CONFIG = {
+  plugins: [
+    ["babel-plugin-transform-react-pug"],
+    ["@babel/plugin-transform-react-jsx"],
+    //[require.resolve("./tools/babel-plugins/require-preact.js")],
+    ["babel-plugin-react-require"],
+    ["babel-plugin-polished"],
+    ["babel-plugin-macros"],
+    ["babel-plugin-add-import-extension"],
+    [
+      "babel-plugin-module-resolver",
+      {
+        root: ["src"],
+        extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"],
+        //alias: createAliasConfig("src")
+      },
+    ],
+    //"react-hot-loader/babel"
+  ],
+  comments: false,
+};
+
 gulp.task("clean", () => del(["dist"]));
+
+gulp.task("babel", () => {
+  return gulp
+    .src(["src/**/*.{tsx,ts,jsx,js}", "!src/**/*.{spec,test}.*"])
+    .pipe(typescript())
+    .pipe(babel(BABEL_CONFIG))
+    .pipe(gulp.dest("build"));
+});
 
 gulp.task("html", () => {
   return gulp
@@ -43,9 +83,10 @@ gulp.task("html", () => {
     .pipe(livereload());
 });
 
+
 gulp.task("styles", async () => {
   gulp
-    .src(["src/**/*.{css,less}"])
+    .src(["src/**/*.{css,less}", "!src/public/**/*"])
     .pipe(concat("styles.less"))
     .pipe(less())
     //.pipe(postcss())
@@ -55,7 +96,6 @@ gulp.task("styles", async () => {
 
 const b = watchify(
   browserify({
-    //exposeAll: true,
     entries: ["build/app/main.js"],
     extensions: [".ts", ".tsx", ".js", ".jsx"],
     cache: {},
@@ -63,24 +103,29 @@ const b = watchify(
     debug: false,
     sourceMaps: false,
     fullPaths: true,
-    plugin:[
-      [discify, { outdir: "build/public/disc" }],
-      [hmr]
-    ],
-    transform: [
-      sucrasify
-    ]
     //dedupe: true
   })
-)
-
-// b.plugin(discify, { outdir: "build/public/disc" });
-// b.plugin(hmr);
-// b.transform(sucrasify);
+);
+b.plugin(discify, { outdir: "build/public/disc" });
+b.plugin(hmr);
+b.transform(sucrasify);
+b.transform([
+  envify({
+    NODE_ENV: "development",
+  }),
+  { global: true },
+]);
 
 // b.transform([
-//   envify({
-//     NODE_ENV: "development",
+//   aliasify.configure({
+//     aliases: {
+//       "react": "react/cjs/react.production.min.js",
+//       "react-dom": "react-dom/cjs/react-dom.production.min.js"
+//       //"react-dom": "react-dom/cjs/react-dom.profiling.min.js",
+//       //react: "preact/compat",
+//       //"react-dom": "preact/compat",
+//     },
+//     appliesTo: { includeExtensions: [".js", ".jsx", ".tsx", ".ts"] },
 //   }),
 //   { global: true },
 // ]);
@@ -95,14 +140,16 @@ async function bundle() {
     .pipe(fs.createWriteStream("build/public/main.js"));
 }
 
+
 gulp.task("roll:app", function () {
+
   //let closure = require("@ampproject/rollup-plugin-closure-compiler");
   //let { terser } = require("rollup-plugin-terser");
 
   return gulp
     .src(["./src/**/*{.js,.jsx,.ts,.tsx}"])
     .pipe(typescript())
-    //.pipe(babel(BABEL_CONFIG))
+    .pipe(babel(BABEL_CONFIG))
     .pipe(
       rollup({
         input: "src/app/main.js",
@@ -134,6 +181,7 @@ gulp.task("roll:app", function () {
     .pipe(gulp.dest("build"));
 });
 
+
 const serve = () => {
   const { polka, sirv } = require("./tools/devserver");
   const { PORT = 3002 } = process.env;
@@ -163,12 +211,14 @@ const serve = () => {
     });
 };
 
+
 gulp.task("watch", async () => {
   livereload.listen();
   gulp.watch("src/**/*.{css,less}", gulp.series("styles"));
   gulp.watch("src/**/*.html", gulp.series("html"));
   gulp.watch("src/**/*.{ts,tsx,js,jsx}", gulp.series("roll:app"));
 });
+
 
 gulp.task(
   "start",
@@ -187,6 +237,7 @@ gulp.task(
     gulp.parallel([serve])
   )
 );
+
 
 // .pipe(source('main.js'))
 // .pipe(buffer())
